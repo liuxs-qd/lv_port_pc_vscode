@@ -72,12 +72,17 @@ target_include_directories(lvgl PUBLIC ${PROJECT_SOURCE_DIR} ${SDL2_INCLUDE_DIRS
 set(MAIN_SOURCES src/mouse_cursor_icon.c src/hal/hal.c)
 set(MAIN_LIBS lvgl lvgl::examples lvgl::demos lvgl::thorvg ${SDL2_LIBRARIES})
 
+# 在 CMakeLists.txt 中
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Create the main executable, depending on the FreeRTOS option
 if(USE_FREERTOS)
     list(APPEND MAIN_SOURCES src/freertos_main.c src/freertos/freertos_posix_port.c ${FREERTOS_SOURCES})
     list(APPEND MAIN_LIBS freertos_config freertos_kernel)
 else()
     list(APPEND MAIN_SOURCES src/main.c)
+    list(APPEND MAIN_SOURCES src/lv_test.c)
+    list(APPEND MAIN_SOURCES src/lv_demo.c)
 endif()
 
 
