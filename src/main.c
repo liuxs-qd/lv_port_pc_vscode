@@ -53,6 +53,7 @@
 #if LV_USE_OS != LV_OS_FREERTOS
 
 void boot_animation_start(int);
+void start_charging_animation(int initial_battery);
 
 int main(int argc, char **argv)
 {
@@ -72,7 +73,8 @@ int main(int argc, char **argv)
   /* - lv_example_label_1(); */
   /* - etc. */
   // lv_demo_widgets();
-  boot_animation_start(0);
+  // boot_animation_start(0);
+  start_charging_animation(20);
 
   while(1) {
     /* Periodically call the lv_task handler.
