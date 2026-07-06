@@ -1,102 +1,94 @@
 #include "lvgl.h"
+#include <src/misc/lv_timer.h>
+#include <src/misc/lv_types.h>
+#include <src/widgets/chart/lv_chart.h>
+#include <stdlib.h> // 用于 rand()
+#include <math.h>   // 用于 sinf()
 
-// 根据你的屏幕分辨率调整（320x240）
-#define BAR_WIDTH  200
-#define BAR_HEIGHT 30
+#define SCREEN_WIDTH  428
+#define SCREEN_HEIGHT 142
 
-static lv_obj_t *battery_bar = NULL;
-static lv_obj_t *percent_label = NULL;
-static lv_anim_t *breath_anim = NULL;   // 保存呼吸动画指针，用于停止
-static int current_battery = 60;         // 假设当前电量为 60%，你可以从实际系统获取
+#define DATA_POINT_COUNT 100 // 显示的点数
 
-/* 呼吸动画执行回调：控制剩余部分的淡入淡出 */
-static void breath_anim_cb(void * obj, int32_t opa)
-{
-    // 进度条的指示器（绿色填充部分）背景为不透明，其余部分通过父容器背景的透明度制造呼吸感
-    lv_obj_set_style_bg_opa(obj, opa, 0);
-}
+static lv_obj_t *wrapper;
+static lv_chart_series_t *ser1;
+static lv_timer_t *data_timer;
+static int32_t vals[DATA_POINT_COUNT]; // 用于存储模拟ADC数据
 
-/* 电量更新回调：每次充电脉冲增加电量 */
-static void charge_pulse_cb(lv_timer_t * timer)
-{
-    // 每次脉冲增加 1% ~ 3%（模拟充电）
-    int increment = lv_rand(1, 3);
-    current_battery += increment;
-    if (current_battery > 100) current_battery = 100;
-
-    // 更新进度条
-    lv_bar_set_value(battery_bar, current_battery, LV_ANIM_OFF);
-
-    // 更新百分比标签
-    char buf[8];
-    lv_snprintf(buf, sizeof(buf), "%d%%", current_battery);
-    lv_label_set_text(percent_label, buf);
-
-    // 当电量达到 100%，停止呼吸动画和充电脉冲
-    if (current_battery >= 100) {
-        lv_timer_del(timer);          // 停止脉冲定时器
-        if (breath_anim) {
-            lv_anim_delete(battery_bar, breath_anim_cb); // 停止呼吸动画
-            breath_anim = NULL;
-        }
-        // 恢复进度条指示器为完全不透明（保证满电时全绿）
-        lv_obj_set_style_bg_opa(battery_bar, LV_OPA_COVER, LV_PART_INDICATOR);
-        LV_LOG_USER("充电完成！");
+void adc_raw(
+    int32_t *raw_signal,  // 输出：原始ADC采样数据
+    uint32_t len          // 长度
+) {
+    // 模拟生成一个带噪声的正弦波信号作为示例
+    for (uint32_t i = 0; i < len; i++) {
+        float t = (float)i / len * 2.0f * 3.14159f * 5.0f; // 5个周期
+        float noise = ((float)(rand() % 100) / 100.0f - 0.5f) * 100; // ±50噪声
+        raw_signal[i] = (int32_t)(1000.0f * sinf(t) + noise)/20 +50;
     }
 }
 
-static lv_anim_t anim1;
-/* 启动充电动画（初始电量为 current_battery） */
-void start_charging_animation(int initial_battery)
-{
-    if (initial_battery < 0) initial_battery = 0;
-    if (initial_battery > 100) initial_battery = 100;
-    current_battery = initial_battery;
+/* 模拟数据生成，您可替换为自己的ADC采集函数 */
+static void simulate_data_generation(lv_timer_t *timer) {
+    lv_obj_t * chart = (lv_obj_t *)lv_timer_get_user_data(timer);
+    // 假设ADC采样值范围是 0-4095，映射到Y轴范围 0-100
+    // 生成一个随机波动，模拟真实信号
+    adc_raw(vals, DATA_POINT_COUNT); 
+    
+    // 将新数据推入图表
+    lv_chart_set_series_values(chart, ser1, vals, DATA_POINT_COUNT);
+}
 
-    // 1. 创建进度条（电池电量条）
-    battery_bar = lv_bar_create(lv_screen_active());
-    lv_obj_set_size(battery_bar, BAR_WIDTH, BAR_HEIGHT);
-    lv_obj_align(battery_bar, LV_ALIGN_CENTER, 0, -20);
+/* 初始化波形显示界面 */
+void create_waveform_ui(void) {
+    /* 创建一个容器，用于容纳图表和刻度，使其可滚动 */
+    wrapper = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(wrapper, SCREEN_WIDTH, SCREEN_HEIGHT);
+    // lv_obj_set_size(wrapper, lv_pct(300), lv_pct(100));
+    lv_obj_set_flex_flow(wrapper, LV_FLEX_FLOW_COLUMN);
+    lv_obj_align(wrapper, LV_ALIGN_CENTER, 0, 0);
 
-    lv_bar_set_range(battery_bar, 0, 100);
-    lv_bar_set_value(battery_bar, current_battery, LV_ANIM_OFF);
+    // 创建图表对象，占据整个屏幕
+    lv_obj_t * chart = lv_chart_create(wrapper);
+    lv_obj_set_size(chart, SCREEN_WIDTH-50, SCREEN_HEIGHT-50);
+    lv_obj_align(chart, LV_ALIGN_CENTER, 0, 0);
 
-    // 进度条背景样式（灰色底）
-    lv_obj_set_style_radius(battery_bar, 8, 0);
-    lv_obj_set_style_bg_color(battery_bar, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_pad_all(battery_bar, 4, 0);
+    // 配置图表基本属性
+    lv_chart_set_type(chart, LV_CHART_TYPE_LINE);          // 线形图
+    lv_chart_set_point_count(chart, DATA_POINT_COUNT);            // 屏幕同时显示100个点
+    lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_Y, 0, 100); // Y轴范围 0-100
+    // lv_chart_set_range(chart, LV_CHART_AXIS_PRIMARY_X, 0, 100); // 如果需要双Y轴
+    lv_chart_set_div_line_count(chart, 3, 11); // 设置网格线数量
 
-    // 进度条指示器（绿色填充部分）
-    lv_obj_set_style_radius(battery_bar, 4, LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(battery_bar, lv_color_hex(0x44CC44), LV_PART_INDICATOR);
-    // ★ 关键：指示器的透明度将用于呼吸效果
-    lv_obj_set_style_bg_opa(battery_bar, LV_OPA_COVER, LV_PART_INDICATOR);
+    // 美化：移除背景填充、边框和点标记，仅保留干净的线
+    lv_obj_set_style_bg_opa(chart, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(chart, 0, 0);
+    lv_obj_set_style_pad_all(chart, 0, 0);
+    lv_obj_set_style_size(chart, 0, 0, LV_PART_INDICATOR);    // 隐藏数据点
 
-    // 2. 创建百分比标签
-    percent_label = lv_label_create(lv_screen_active());
-    char buf[8];
-    lv_snprintf(buf, sizeof(buf), "%d%%", current_battery);
-    lv_label_set_text(percent_label, buf);
-    lv_obj_set_style_text_font(percent_label, &lv_font_montserrat_18, 0);
-    lv_obj_align(percent_label, LV_ALIGN_CENTER, 0, 40);
+    // 添加数据序列 (Series)
+    ser1 = lv_chart_add_series(chart, lv_color_hex(0x00FF00), LV_CHART_AXIS_PRIMARY_Y);
+    // 设置线条宽度和圆角，使波形更平滑
+    lv_obj_set_style_line_width(chart, 2, LV_PART_INDICATOR);
+    lv_obj_set_style_line_rounded(chart, 1, LV_PART_INDICATOR);
 
-    // 3. 如果还没充满，启动呼吸动画
-    if (current_battery < 100) {
-        // 呼吸动画：控制指示器透明度在 0.3 ~ 1.0 之间循环（模拟呼吸）
-        breath_anim = &anim1;
-        lv_anim_init(breath_anim);
-        lv_anim_set_var(breath_anim, battery_bar);
-        lv_anim_set_exec_cb(breath_anim, breath_anim_cb);
-        lv_anim_set_values(breath_anim, LV_OPA_30, LV_OPA_COVER);
-        lv_anim_set_time(breath_anim, 1500);          // 一个完整呼吸周期
-        lv_anim_set_path_cb(breath_anim, lv_anim_path_ease_in_out);
-        lv_anim_set_repeat_count(breath_anim, LV_ANIM_REPEAT_INFINITE);
-        lv_anim_start(breath_anim);
-
-        // 4. 启动充电脉冲定时器（每 300ms 增加一点电量）
-        lv_timer_t * timer = lv_timer_create(charge_pulse_cb, 300, NULL);
-        lv_timer_set_repeat_count(timer, -1); // 无限重复，直到达到100%
-    } else {
-        LV_LOG_USER("电池已满，不启动充电动画");
+    // 5. 初始化数据，防止出现从0开始的“扫描线”
+    for (int i = 0; i < DATA_POINT_COUNT; i++) {
+        lv_chart_set_next_value(chart, ser1, 50); 
     }
+
+    /* 创建刻度对象，放在图表下方 */
+    lv_obj_t * scale_bottom = lv_scale_create(wrapper);
+    lv_scale_set_mode(scale_bottom, LV_SCALE_MODE_HORIZONTAL_BOTTOM);
+    lv_obj_set_size(scale_bottom, SCREEN_WIDTH-50, 10);
+    lv_scale_set_total_tick_count(scale_bottom, 11); // 0-100刻度，每10个单位一个刻度
+
+    lv_scale_set_major_tick_every(scale_bottom, 1); // 每10个单位一个主刻度
+
+    /* 3. 设置自定义刻度标签 */
+    static const char * txt[] = {"0", "10", "20", "30", "40", "50", 
+                        "60", "70", "80", "90", "100", NULL};
+    lv_scale_set_text_src(scale_bottom, txt);
+
+    // 6. 启动定时器，模拟以50ms间隔不断采集新数据
+    data_timer = lv_timer_create(simulate_data_generation, 50, chart);
 }

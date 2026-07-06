@@ -54,6 +54,7 @@
 
 void boot_animation_start(int);
 void start_charging_animation(int initial_battery);
+void create_waveform_ui(void);
 
 int main(int argc, char **argv)
 {
@@ -74,7 +75,8 @@ int main(int argc, char **argv)
   /* - etc. */
   // lv_demo_widgets();
   // boot_animation_start(0);
-  start_charging_animation(20);
+  // start_charging_animation(20);
+  create_waveform_ui();
 
   while(1) {
     /* Periodically call the lv_task handler.
