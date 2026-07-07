@@ -8,7 +8,7 @@
 #define SCREEN_WIDTH  428
 #define SCREEN_HEIGHT 142
 
-#define DATA_POINT_COUNT 100 // 显示的点数
+#define DATA_POINT_COUNT 1024 // 显示的点数
 
 static lv_obj_t *wrapper;
 static lv_chart_series_t *ser1;
@@ -36,6 +36,7 @@ static void simulate_data_generation(lv_timer_t *timer) {
     
     // 将新数据推入图表
     lv_chart_set_series_values(chart, ser1, vals, DATA_POINT_COUNT);
+    lv_chart_refresh(chart);
 }
 
 /* 初始化波形显示界面 */

@@ -5,36 +5,29 @@
 #include <stdbool.h>
 #include <math.h>
 
+#include "wave.h"
+
 #define SAMPLE_LEN  1024        // 采样点数（可调整）
 #define THRESHOLD   1000        // 闸门门限
 #define ADC_MAX     4096        // ADC最大值（12位）
 
-// 波峰信息结构体
-typedef struct {
-    uint32_t index;             // 波峰在数组中的位置（采样序号）
-    uint16_t amplitude;         // 波峰幅度值
-} PeakInfo;
-
-// 函数声明
-int find_all_peaks(
-    const uint16_t *signal,     // 输入信号数组
-    uint32_t        len,        // 信号长度
-    uint16_t        threshold,  // 幅度门限
-    PeakInfo       *peaks,      // 输出波峰数组
-    uint32_t        max_peaks   // 最大允许波峰数量
-);
 
 // 主函数示例
-int main() {
+int _main() {
     // 模拟信号数据（实际应从ADC读取）
     uint16_t signal[SAMPLE_LEN] = {0};
     
+    // 在位置 50, 200, 450, 800 处产生高斯型波峰
+    int peak_pos[] = {50, 200, 450, 800};
+    int peak_amp[] = {2000, 1500, 3000, 1200};
+    
+    for (int i = 0; i < 4; i++) {
+        peak_pos[i] += rand() % 20 - 10; // 随机偏移 ±10
+        peak_amp[i] += rand() % 200 - 100; // 随机偏移 ±100
+    }
+
     // 生成模拟信号：包含多个波峰
     for (int i = 0; i < SAMPLE_LEN; i++) {
-        // 在位置 50, 200, 450, 800 处产生高斯型波峰
-        int peak_pos[] = {50, 200, 450, 800};
-        int peak_amp[] = {2000, 1500, 3000, 1200};
-        
         signal[i] = 100; // 基底噪声
         for (int j = 0; j < 4; j++) {
             int dx = i - peak_pos[j];

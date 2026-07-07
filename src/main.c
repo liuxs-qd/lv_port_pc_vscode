@@ -55,6 +55,7 @@
 void boot_animation_start(int);
 void start_charging_animation(int initial_battery);
 void create_waveform_ui(void);
+void create_waveform_ui2(void);
 
 int main(int argc, char **argv)
 {
@@ -76,7 +77,8 @@ int main(int argc, char **argv)
   // lv_demo_widgets();
   // boot_animation_start(0);
   // start_charging_animation(20);
-  create_waveform_ui();
+  // lv_example_chart_6();
+  create_waveform_ui2();
 
   while(1) {
     /* Periodically call the lv_task handler.
@@ -95,6 +97,16 @@ int main(int argc, char **argv)
   return 0;
 }
 
+static void (*root_delete)(void) = NULL;
+
+void lv_set_root(void (*cb)(void))
+{
+    if(root_delete != NULL)
+    {
+        root_delete();
+    }
+    root_delete = cb;
+}
 
 #endif
 
