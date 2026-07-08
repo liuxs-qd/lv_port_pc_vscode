@@ -83,6 +83,7 @@ else()
     list(APPEND MAIN_SOURCES src/main.c)
     list(APPEND MAIN_SOURCES src/lv_test.c)
     list(APPEND MAIN_SOURCES src/lv_demo.c)
+    list(APPEND MAIN_SOURCES src/lv_wave.c)
 endif()
 
 
