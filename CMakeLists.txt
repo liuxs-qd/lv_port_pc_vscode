@@ -84,6 +84,7 @@ else()
     list(APPEND MAIN_SOURCES src/lv_test.c)
     list(APPEND MAIN_SOURCES src/lv_demo.c)
     list(APPEND MAIN_SOURCES src/lv_wave.c)
+    list(APPEND MAIN_SOURCES src/utilities/wave2.c)
 endif()
 
 

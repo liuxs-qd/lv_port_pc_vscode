@@ -1,5 +1,5 @@
 /**
- * @file lv_demo.c
+ * @file lv_wave.c
  *
  */
 
@@ -7,8 +7,11 @@
  *      INCLUDES
  *********************/
 #include "gui.h"
+#include <src/core/lv_obj_pos.h>
 #include <stdlib.h> // 用于 rand()
 #include <math.h> // 用于 exp()
+
+#include "utilities/wave.h"
 
 #if 1
 
@@ -32,6 +35,7 @@ void destroy_waveform_ui(void);
 /**********************
  *  STATIC VARIABLES
  **********************/
+static lv_obj_t *root;
 static lv_obj_t *chart;
 static lv_chart_series_t *ser1;
 static lv_timer_t *data_timer;
@@ -68,6 +72,9 @@ typedef struct {
 float signal_float[TOTAL_POINTS];
 uint16_t signal_uint16[TOTAL_POINTS];
 
+PeakInfo peaks[100];
+
+
 int create_signal() {
     // 定义缺陷回波参数
     EchoParams echos[] = {
@@ -82,15 +89,15 @@ int create_signal() {
     for (int i = 0; i < TOTAL_POINTS; i++) {
         float t = (float)i / SAMPLE_RATE;   // 当前时间（秒）
 
-        // 3.1 基底噪声（用小幅正弦波模拟随机噪声）
+        // 基底噪声（用小幅正弦波模拟随机噪声）
         float noise = BASE_NOISE * (0.5f + 0.5f * sinf(2.0f * PI * 1234.5f * t)); // 简单模拟，实际可用随机数
 
-        // 3.2 正常载波信号（基底振荡）
+        // 正常载波信号（基底振荡）
         float carrier = BASE_NOISE * sinf(2.0f * PI * CARRIER_FREQ * t);
 
         float signal = carrier + noise;
 
-        // 3.3 叠加缺陷回波（高斯包络调制）
+        // 叠加缺陷回波（高斯包络调制）
         for (int e = 0; e < echo_count; e++) {
             float x = (float)i - e * echos[0].center;
             // 高斯包络：exp(-x^2 / width^2)
@@ -100,15 +107,15 @@ int create_signal() {
             signal += echo_signal;
         }
 
-        // 3.4 加入少量随机噪声（模拟真实环境）
+        // 加入少量随机噪声（模拟真实环境）
         // 此处用固定种子伪随机，实际可用rand()
         float random_noise = (float)(rand() % 100) / 100.0f * 20.0f - 10.0f;
         signal += random_noise;
 
-        // 3.5 存储浮点值
+        // 存储浮点值
         signal_float[i] = signal;
 
-        // 3.6 转换为无符号整型（限幅到0~4095，模拟12位ADC）
+        // 转换为无符号整型（限幅到0~4095，模拟12位ADC）
         int int_val = (int)(signal + 2048.0f);  // 假设偏置2048
         if (int_val < 0) int_val = 0;
         if (int_val > 4095) int_val = 4095;
@@ -150,6 +157,7 @@ void adc_raw_init()
         ypoints[i] = signal_uint16[i*2]/40;
         // ypoints[i] = test_signal[i*TOTAL_POINTS/CHART_WIDTH]/40;
     }
+
 }
 
 static void add_data(lv_timer_t * t)
@@ -178,17 +186,30 @@ static void add_data(lv_timer_t * t)
 void lv_wave(void)
 {
     /*Create a stacked_area_chart.obj*/
-    chart = lv_chart_create(lv_screen_active());
+    root = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(root, LV_HOR_RES, LV_VER_RES);
+    chart = lv_chart_create(root);
     lv_chart_set_update_mode(chart, LV_CHART_UPDATE_MODE_CIRCULAR);
     lv_obj_set_style_size(chart, 0, 0, LV_PART_INDICATOR);
     lv_obj_set_size(chart, CHART_WIDTH, CHART_HEIGHT);
-    lv_obj_center(chart);
+    lv_obj_align(chart, LV_ALIGN_BOTTOM_MID, 0, 0);
+
+    lv_obj_t * label = lv_label_create(root);
+    lv_label_set_text(label, "Waveform");
+    lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
 
     lv_chart_set_point_count(chart, CHART_WIDTH);
     ser1 = lv_chart_add_series(chart, lv_palette_main(LV_PALETTE_RED), LV_CHART_AXIS_PRIMARY_Y);
     /*Prefill with data*/
     adc_raw_init();
-
+    int peak_count = find_all_peaks(signal_uint16, TOTAL_POINTS, 3000, peaks, 100);
+    char buffer[256];
+    for(int i = 0; i < peak_count; i++) {
+        snprintf(buffer, sizeof(buffer), "Peak %d: Pos=%d, Amp=%d", i+1, peaks[i].index, peaks[i].amplitude);
+        printf("%s\n", buffer);
+    }
+    snprintf(buffer, sizeof(buffer), "Detected Peaks: %d", peak_count);
+    lv_label_set_text(label, buffer);
     // lv_chart_set_series_values(chart, ser1, raw_data, SAMPLE_LEN);
 
     // data_timer = lv_timer_create(add_data, 1000, chart);
