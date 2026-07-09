@@ -8,6 +8,7 @@
  *********************/
 #include "gui.h"
 #include <src/core/lv_obj_pos.h>
+#include <src/core/lv_obj_style_gen.h>
 #include <stdlib.h> // 用于 rand()
 #include <math.h> // 用于 exp()
 
@@ -195,7 +196,10 @@ void lv_wave(void)
     lv_obj_align(chart, LV_ALIGN_BOTTOM_MID, 0, 0);
 
     lv_obj_t * label = lv_label_create(root);
-    lv_label_set_text(label, "Waveform");
+    // 为一个标签设置自定义字体
+    // lv_obj_set_style_text_font(label, &hanzi, 0);
+    lv_obj_set_style_text_color(label, lv_color_hex(0x0000FF), 0);
+    lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 0);
 
     lv_chart_set_point_count(chart, CHART_WIDTH);
@@ -208,7 +212,7 @@ void lv_wave(void)
         snprintf(buffer, sizeof(buffer), "Peak %d: Pos=%d, Amp=%d", i+1, peaks[i].index, peaks[i].amplitude);
         printf("%s\n", buffer);
     }
-    snprintf(buffer, sizeof(buffer), "Detected Peaks: %d", peak_count);
+    snprintf(buffer, sizeof(buffer), "你好 Peaks: %d", peak_count);
     lv_label_set_text(label, buffer);
     // lv_chart_set_series_values(chart, ser1, raw_data, SAMPLE_LEN);
 
